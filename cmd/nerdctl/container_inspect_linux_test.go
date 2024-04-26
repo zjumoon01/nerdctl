@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/containerd/nerdctl/v2/pkg/inspecttypes/dockercompat"
+	"github.com/containerd/nerdctl/v2/pkg/labels"
 	"github.com/containerd/nerdctl/v2/pkg/testutil"
 	"github.com/docker/go-connections/nat"
 	"gotest.tools/v3/assert"
@@ -147,13 +148,18 @@ func TestContainerInspectContainsLabel(t *testing.T) {
 	base := testutil.NewBase(t)
 	defer base.Cmd("rm", "-f", testContainer).Run()
 
-	base.Cmd("run", "-d", "--name", testContainer, "--label", "foo=foo", "--label", "bar=bar", testutil.NginxAlpineImage).AssertOK()
+	base.Cmd("run", "-d", "--name", testContainer, "--label", "foo=foo", "--label", "bar=bar", "--mount", "type=bind,src=/tmp,dst=/app,readonly=false,bind-propagation=rprivate", testutil.NginxAlpineImage).AssertOK()
 	base.EnsureContainerStarted(testContainer)
 	inspect := base.InspectContainer(testContainer)
 	lbs := inspect.Config.Labels
 
 	assert.Equal(base.T, "foo", lbs["foo"])
 	assert.Equal(base.T, "bar", lbs["bar"])
+
+	// internal labels
+	labelMount := lbs[labels.Mounts]
+	expectedLabelMount := "[{\"Type\":\"bind\",\"Source\":\"/tmp\",\"Destination\":\"/app\",\"Mode\":\"rprivate,rbind\",\"RW\":true,\"Propagation\":\"rprivate\"}]"
+	assert.Equal(base.T, expectedLabelMount, labelMount)
 }
 
 func TestContainerInspectState(t *testing.T) {
